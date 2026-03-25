@@ -13,12 +13,13 @@ interface ServerInfo {
 export function ServerCard() {
   const { baseUrl, setBaseUrl, setEndpoints } = useServer()
   const skFetch = useSkFetch()
-  const [urlInput, setUrlInput] = useState(baseUrl)
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null)
   const [selfId, setSelfId] = useState<string | null>(null)
   const [latency, setLatency] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<CardStatus>('ok')
+  const [showUrlInput, setShowUrlInput] = useState(false)
+  const [urlInput, setUrlInput] = useState(baseUrl)
 
   const fetchServerInfo = useCallback(async function fetchServerInfo() {
     setError(null)
@@ -43,7 +44,7 @@ export function ServerCard() {
       const hasV2 = 'v2' in (data.endpoints ?? {})
       setEndpoints({ hasV1, hasV2 })
 
-      // GET /signalk/v1/self — vessel UUID
+      // GET /signalk/v1/api/self — vessel UUID
       // Response: "vessels.urn:mrn:imo:mmsi:123456789"
       if (hasV1) {
         const selfRes = await skFetch(`${baseUrl}/signalk/v1/api/self`)
@@ -70,6 +71,7 @@ export function ServerCard() {
     if (trimmed !== baseUrl) {
       setBaseUrl(trimmed)
     }
+    setShowUrlInput(false)
   }
 
   return (
@@ -80,24 +82,6 @@ export function ServerCard() {
       status={status}
     >
       <div data-testid="server-card" className="space-y-3">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={urlInput}
-            onChange={(e) => setUrlInput(e.target.value)}
-            onBlur={handleUrlSubmit}
-            onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
-            className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
-            placeholder="http://localhost:3000"
-          />
-          <button
-            onClick={fetchServerInfo}
-            className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700"
-          >
-            Connect
-          </button>
-        </div>
-
         {error && <p className="text-sm text-red-600">{error}</p>}
 
         {serverInfo && (
@@ -107,6 +91,9 @@ export function ServerCard() {
 
             <dt className="text-gray-500">Version</dt>
             <dd className="text-gray-900">{serverInfo.server.version}</dd>
+
+            <dt className="text-gray-500">Connected to</dt>
+            <dd className="text-gray-900 break-all">{baseUrl}</dd>
 
             {selfId && (
               <>
@@ -124,6 +111,34 @@ export function ServerCard() {
             <dt className="text-gray-500">API v2</dt>
             <dd>{serverInfo.endpoints?.v2 ? '✓' : '—'}</dd>
           </dl>
+        )}
+
+        {showUrlInput ? (
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              onBlur={handleUrlSubmit}
+              onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
+              className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
+              placeholder="http://localhost:3000"
+              autoFocus
+            />
+            <button
+              onClick={handleUrlSubmit}
+              className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700"
+            >
+              Connect
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => { setUrlInput(baseUrl); setShowUrlInput(true) }}
+            className="text-xs text-gray-400 hover:text-gray-600"
+          >
+            Connect to a different server...
+          </button>
         )}
 
         <RawJson data={serverInfo} />

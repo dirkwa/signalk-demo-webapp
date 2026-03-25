@@ -191,6 +191,20 @@ export function signalkMockPlugin(): Plugin {
           return json(res, 200, { valid: true })
         }
 
+        // GET /skServer/loginStatus — session status check
+        if (url === '/skServer/loginStatus' && req.method === 'GET') {
+          const authHeader = req.headers.authorization
+          const isLoggedIn = authHeader?.startsWith('Bearer ')
+          return json(res, 200, {
+            status: isLoggedIn ? 'loggedIn' : 'notLoggedIn',
+            readOnlyAccess: false,
+            authenticationRequired: true,
+            allowNewUserRegistration: true,
+            allowDeviceAccessRequests: true,
+            ...(isLoggedIn ? { userLevel: 'admin', username: 'admin' } : {}),
+          })
+        }
+
         // GET /signalk/v1/vessels/self/notifications
         if (url === '/signalk/v1/vessels/self/notifications' && req.method === 'GET') {
           return json(res, 200, notificationsStore)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useServer } from '../hooks/useServer.ts'
 import { useSkFetch } from '../hooks/useSkFetch.ts'
 import { CardShell } from '../components/CardShell.tsx'
@@ -9,6 +9,17 @@ interface JwtPayload {
   iat?: number
   roles?: string[]
   id?: string
+}
+
+interface LoginStatus {
+  status: 'loggedIn' | 'notLoggedIn'
+  readOnlyAccess: boolean
+  authenticationRequired: boolean
+  allowNewUserRegistration: boolean
+  allowDeviceAccessRequests: boolean
+  userLevel?: string
+  username?: string
+  noUsers?: boolean
 }
 
 function decodeJwt(token: string): JwtPayload | null {
@@ -25,7 +36,7 @@ function formatTimestamp(epoch: number): string {
 }
 
 export function AuthCard() {
-  const { v1Base, setToken, isAuthenticated } = useServer()
+  const { baseUrl, v1Base, setToken, isAuthenticated } = useServer()
   const skFetch = useSkFetch()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -33,7 +44,28 @@ export function AuthCard() {
   const [response, setResponse] = useState<unknown>(null)
   const [decoded, setDecoded] = useState<JwtPayload | null>(null)
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
+  const [loginStatus, setLoginStatus] = useState<LoginStatus | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+
+  const checkLoginStatus = useCallback(async () => {
+    try {
+      // GET /skServer/loginStatus — check if browser already has a session
+      // Response: { status: "loggedIn"|"notLoggedIn", readOnlyAccess, authenticationRequired,
+      //             userLevel, username, allowNewUserRegistration, allowDeviceAccessRequests }
+      const res = await skFetch(`${baseUrl}/skServer/loginStatus`)
+      if (res.ok) {
+        const data = await res.json() as LoginStatus
+        setLoginStatus(data)
+      }
+    } catch {
+      // server might not have this endpoint
+    }
+  }, [baseUrl, skFetch])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- check session on mount
+    checkLoginStatus()
+  }, [checkLoginStatus])
 
   useEffect(() => {
     clearInterval(timerRef.current)
@@ -80,6 +112,7 @@ export function AuthCard() {
       const body = data as { token: string; timeToLive?: number }
       setToken(body.token)
       setDecoded(decodeJwt(body.token))
+      checkLoginStatus()
     } catch {
       setError('Server unreachable')
     }
@@ -97,16 +130,55 @@ export function AuthCard() {
     setDecoded(null)
     setResponse(null)
     setError(null)
+    checkLoginStatus()
   }
 
   return (
     <CardShell
       title="Authentication"
       sourceFile="src/cards/AuthCard.tsx"
-      apiPaths={['POST /signalk/v1/auth/login', 'PUT /signalk/v1/auth/logout']}
+      apiPaths={[
+        'GET /skServer/loginStatus',
+        'POST /signalk/v1/auth/login',
+        'PUT /signalk/v1/auth/logout',
+      ]}
       status="ok"
     >
       <div data-testid="auth-card" className="space-y-3">
+        {loginStatus && (
+          <div className="rounded bg-gray-50 p-2 text-sm">
+            <p className="mb-1 text-xs font-medium text-gray-500">
+              GET /skServer/loginStatus
+            </p>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+              <dt className="text-gray-500">Session</dt>
+              <dd className={loginStatus.status === 'loggedIn' ? 'text-green-600' : 'text-gray-600'}>
+                {loginStatus.status}
+              </dd>
+
+              {loginStatus.username && (
+                <>
+                  <dt className="text-gray-500">User</dt>
+                  <dd className="text-gray-900">{loginStatus.username}</dd>
+                </>
+              )}
+
+              {loginStatus.userLevel && (
+                <>
+                  <dt className="text-gray-500">Level</dt>
+                  <dd className="text-gray-900">{loginStatus.userLevel}</dd>
+                </>
+              )}
+
+              <dt className="text-gray-500">Auth required</dt>
+              <dd className="text-gray-600">{loginStatus.authenticationRequired ? 'yes' : 'no'}</dd>
+
+              <dt className="text-gray-500">Read-only access</dt>
+              <dd className="text-gray-600">{loginStatus.readOnlyAccess ? 'yes' : 'no'}</dd>
+            </dl>
+          </div>
+        )}
+
         {!isAuthenticated ? (
           <div className="space-y-2">
             <input
@@ -179,7 +251,7 @@ export function AuthCard() {
 
         {response !== null && (
           <div>
-            <p className="mb-1 text-xs text-gray-500">Raw response:</p>
+            <p className="mb-1 text-xs text-gray-500">Login response:</p>
             <pre className="max-h-48 overflow-auto rounded bg-gray-50 p-2 text-xs text-gray-700">
               {JSON.stringify(response, null, 2)}
             </pre>
