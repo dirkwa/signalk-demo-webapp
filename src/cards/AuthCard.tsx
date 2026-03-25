@@ -1,0 +1,191 @@
+import { useState, useEffect, useRef } from 'react'
+import { useServer } from '../context/ServerContext.tsx'
+import { useSkFetch } from '../hooks/useSkFetch.ts'
+import { CardShell } from '../components/CardShell.tsx'
+
+interface JwtPayload {
+  sub?: string
+  exp?: number
+  iat?: number
+  roles?: string[]
+  id?: string
+}
+
+function decodeJwt(token: string): JwtPayload | null {
+  try {
+    const payload = token.split('.')[1]
+    return JSON.parse(atob(payload))
+  } catch {
+    return null
+  }
+}
+
+function formatTimestamp(epoch: number): string {
+  return new Date(epoch * 1000).toLocaleString()
+}
+
+export function AuthCard() {
+  const { v1Base, setToken, isAuthenticated } = useServer()
+  const skFetch = useSkFetch()
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [response, setResponse] = useState<unknown>(null)
+  const [decoded, setDecoded] = useState<JwtPayload | null>(null)
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+
+  useEffect(() => {
+    clearInterval(timerRef.current)
+    if (!decoded?.exp) {
+      setSecondsLeft(null)
+      return
+    }
+    function tick() {
+      const remaining = Math.max(0, Math.floor(decoded!.exp! - Date.now() / 1000))
+      setSecondsLeft(remaining)
+    }
+    tick()
+    timerRef.current = setInterval(tick, 1000)
+    return () => clearInterval(timerRef.current)
+  }, [decoded])
+
+  async function handleLogin() {
+    setError(null)
+    try {
+      // POST /signalk/v1/auth/login
+      // Body: { "username": "admin", "password": "xxx" }
+      // Response: { "token": "eyJ...", "timeToLive": 86400000 }
+      const res = await skFetch(`${v1Base}/auth/login`, {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      })
+
+      const data: unknown = await res.json()
+      setResponse(data)
+
+      if (res.status === 401) {
+        setError('Invalid credentials')
+        return
+      }
+      if (res.status === 403) {
+        setError('Account disabled or no permission')
+        return
+      }
+      if (!res.ok) {
+        setError(`HTTP ${res.status}`)
+        return
+      }
+
+      const body = data as { token: string; timeToLive?: number }
+      setToken(body.token)
+      setDecoded(decodeJwt(body.token))
+    } catch {
+      setError('Server unreachable')
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      // PUT /signalk/v1/auth/logout
+      // Response: "Logout OK"
+      await skFetch(`${v1Base}/auth/logout`, { method: 'PUT' })
+    } catch {
+      // logout best-effort
+    }
+    setToken(null)
+    setDecoded(null)
+    setResponse(null)
+    setError(null)
+  }
+
+  return (
+    <CardShell
+      title="Authentication"
+      sourceFile="src/cards/AuthCard.tsx"
+      apiPaths={['POST /signalk/v1/auth/login', 'PUT /signalk/v1/auth/logout']}
+      status="ok"
+    >
+      <div data-testid="auth-card" className="space-y-3">
+        {!isAuthenticated ? (
+          <div className="space-y-2">
+            <input
+              type="text"
+              placeholder="Username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+            />
+            <button
+              onClick={handleLogin}
+              className="w-full rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+            >
+              Login
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {decoded && (
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                <dt className="text-gray-500">User</dt>
+                <dd className="text-gray-900">{decoded.id ?? decoded.sub ?? '—'}</dd>
+
+                <dt className="text-gray-500">Issued</dt>
+                <dd className="text-gray-900">
+                  {decoded.iat ? formatTimestamp(decoded.iat) : '—'}
+                </dd>
+
+                <dt className="text-gray-500">Expires</dt>
+                <dd className="text-gray-900">
+                  {decoded.exp ? formatTimestamp(decoded.exp) : '—'}
+                </dd>
+
+                {secondsLeft !== null && (
+                  <>
+                    <dt className="text-gray-500">TTL</dt>
+                    <dd className="text-gray-900 font-mono">
+                      {Math.floor(secondsLeft / 3600)}h {Math.floor((secondsLeft % 3600) / 60)}m {secondsLeft % 60}s
+                    </dd>
+                  </>
+                )}
+
+                {decoded.roles && (
+                  <>
+                    <dt className="text-gray-500">Roles</dt>
+                    <dd className="text-gray-900">{decoded.roles.join(', ')}</dd>
+                  </>
+                )}
+              </dl>
+            )}
+
+            <button
+              onClick={handleLogout}
+              className="w-full rounded bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700"
+            >
+              Logout
+            </button>
+          </div>
+        )}
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+
+        {response !== null && (
+          <div>
+            <p className="mb-1 text-xs text-gray-500">Raw response:</p>
+            <pre className="max-h-48 overflow-auto rounded bg-gray-50 p-2 text-xs text-gray-700">
+              {JSON.stringify(response, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
+    </CardShell>
+  )
+}
