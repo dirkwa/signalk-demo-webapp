@@ -9,3 +9,5 @@ on:
 jobs:
   test:
     uses: dirkwa/signalk-server/.github/workflows/plugin-ci.yml@feat-ci-for-plugins
+    with:
+      test-command: 'echo "Playwright E2E tests require a running server — skipped in plugin CI"'
