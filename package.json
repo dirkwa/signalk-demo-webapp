@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "description": "SignalK server API demonstration webapp",
   "main": "plugin/index.js",
-  "type": "module",
   "keywords": [
-    "signalk-webapp"
+    "signalk-webapp",
+    "signalk-node-server-plugin"
   ],
+  "engines": {
+    "node": ">=18"
+  },
   "signalk": {
     "appIcon": "./public/app-icon.png",
     "displayName": "Demo Webapp"
