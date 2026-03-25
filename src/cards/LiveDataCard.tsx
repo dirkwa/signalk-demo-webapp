@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSkStream } from '../hooks/useSkStream.ts'
-import { useUnitPrefs } from '../context/UnitPrefsContext.tsx'
+import { useUnitPrefs } from '../hooks/useUnitPrefs.ts'
 import { CardShell } from '../components/CardShell.tsx'
 import { RawJson } from '../components/RawJson.tsx'
 import { SK_PATHS } from '../lib/skPaths.ts'
@@ -29,6 +29,7 @@ export function LiveDataCard() {
     for (const update of stream.lastDelta.updates) {
       if (!update.values) continue
       for (const { path, value } of update.values) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing external WS data
         setValues((prev) => ({ ...prev, [path]: value }))
       }
     }
@@ -96,7 +97,7 @@ export function LiveDataCard() {
         {subscribed && (
           <p className="text-xs text-gray-400">
             Stream: {stream.status}
-            {stream.status === 'closed' && ` (reconnect #${stream.retryCount})`}
+            {stream.status === 'closed' && ' (reconnecting...)'}
           </p>
         )}
 

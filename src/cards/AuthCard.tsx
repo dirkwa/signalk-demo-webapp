@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useServer } from '../context/ServerContext.tsx'
+import { useServer } from '../hooks/useServer.ts'
 import { useSkFetch } from '../hooks/useSkFetch.ts'
 import { CardShell } from '../components/CardShell.tsx'
 
@@ -38,12 +38,12 @@ export function AuthCard() {
   useEffect(() => {
     clearInterval(timerRef.current)
     if (!decoded?.exp) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting countdown
       setSecondsLeft(null)
       return
     }
     function tick() {
-      const remaining = Math.max(0, Math.floor(decoded!.exp! - Date.now() / 1000))
-      setSecondsLeft(remaining)
+      setSecondsLeft(Math.max(0, Math.floor(decoded!.exp! - Date.now() / 1000)))
     }
     tick()
     timerRef.current = setInterval(tick, 1000)

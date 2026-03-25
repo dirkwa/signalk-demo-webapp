@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useServer } from '../context/ServerContext.tsx'
+import { useState, useEffect, useCallback } from 'react'
+import { useServer } from '../hooks/useServer.ts'
 import { useSkFetch } from '../hooks/useSkFetch.ts'
 import { CardShell } from '../components/CardShell.tsx'
 import { RawJson } from '../components/RawJson.tsx'
@@ -20,7 +20,7 @@ export function ServerCard() {
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<CardStatus>('ok')
 
-  async function fetchServerInfo() {
+  const fetchServerInfo = useCallback(async function fetchServerInfo() {
     setError(null)
     try {
       // GET /signalk — server discovery endpoint
@@ -58,11 +58,12 @@ export function ServerCard() {
       setStatus('error')
       setError('Server unreachable')
     }
-  }
+  }, [baseUrl, skFetch, setEndpoints])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch on mount/URL change
     fetchServerInfo()
-  }, [baseUrl])
+  }, [fetchServerInfo])
 
   function handleUrlSubmit() {
     const trimmed = urlInput.replace(/\/+$/, '')

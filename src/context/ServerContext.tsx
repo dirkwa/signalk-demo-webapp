@@ -1,20 +1,5 @@
-import { createContext, useContext, useState, useMemo, type ReactNode } from 'react'
-
-interface ServerContextValue {
-  baseUrl: string
-  setBaseUrl: (url: string) => void
-  v1Base: string
-  v2Base: string
-  wsBase: string
-  token: string | null
-  setToken: (token: string | null) => void
-  isAuthenticated: boolean
-  hasV1: boolean
-  hasV2: boolean
-  setEndpoints: (endpoints: { hasV1: boolean; hasV2: boolean }) => void
-}
-
-const ServerContext = createContext<ServerContextValue | null>(null)
+import { useState, useMemo, type ReactNode } from 'react'
+import { ServerContext, type ServerContextValue } from './serverContext.ts'
 
 function deriveWsBase(baseUrl: string): string {
   const url = new URL(baseUrl)
@@ -46,10 +31,4 @@ export function ServerProvider({ children }: { children: ReactNode }) {
       {children}
     </ServerContext>
   )
-}
-
-export function useServer(): ServerContextValue {
-  const ctx = useContext(ServerContext)
-  if (!ctx) throw new Error('useServer must be used within ServerProvider')
-  return ctx
 }

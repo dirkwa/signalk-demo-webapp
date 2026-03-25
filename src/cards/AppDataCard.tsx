@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useServer } from '../context/ServerContext.tsx'
+import { useServer } from '../hooks/useServer.ts'
 import { useSkFetch } from '../hooks/useSkFetch.ts'
 import { CardShell } from '../components/CardShell.tsx'
 import type { CardStatus } from '../components/StatusBadge.tsx'
@@ -35,7 +35,7 @@ export function AppDataCard() {
         }
       })
       .catch(() => {})
-  }, [globalUrl])
+  }, [globalUrl, skFetch])
 
   useEffect(() => {
     if (!isAuthenticated) return
@@ -48,7 +48,7 @@ export function AppDataCard() {
         }
       })
       .catch(() => {})
-  }, [userUrl, isAuthenticated])
+  }, [userUrl, isAuthenticated, skFetch])
 
   async function saveGlobal() {
     setGlobalSave('saving')

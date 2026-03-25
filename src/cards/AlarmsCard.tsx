@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useServer } from '../context/ServerContext.tsx'
+import { useState, useEffect, useCallback } from 'react'
+import { useServer } from '../hooks/useServer.ts'
 import { useSkFetch } from '../hooks/useSkFetch.ts'
 import { useSkStream } from '../hooks/useSkStream.ts'
 import { CardShell } from '../components/CardShell.tsx'
@@ -39,7 +39,7 @@ export function AlarmsCard() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  async function loadNotifications() {
+  const loadNotifications = useCallback(async () => {
     try {
       // GET /signalk/v2/api/notifications
       const res = await skFetch(`${v2Base}/notifications`)
@@ -55,7 +55,7 @@ export function AlarmsCard() {
     } catch {
       setError('Failed to load notifications')
     }
-  }
+  }, [v2Base, skFetch])
 
   useEffect(() => {
     if (!hasV2) return
@@ -65,12 +65,13 @@ export function AlarmsCard() {
     stream.subscribe([{ path: 'notifications.*', period: 1000 }])
 
     return () => stream.disconnect()
-  }, [hasV2])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasV2, loadNotifications])
 
   useEffect(() => {
     if (!stream.lastDelta?.updates) return
     loadNotifications()
-  }, [stream.lastDelta])
+  }, [stream.lastDelta, loadNotifications])
 
   async function handleAction(id: string, action: 'acknowledge' | 'silence' | 'clear') {
     // POST /signalk/v2/api/notifications/:id/{action}

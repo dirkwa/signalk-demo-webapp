@@ -1,4 +1,4 @@
-import { useUnitPrefs } from '../context/UnitPrefsContext.tsx'
+import { useUnitPrefs } from '../hooks/useUnitPrefs.ts'
 import { CardShell } from '../components/CardShell.tsx'
 import type { SpeedUnit, DepthUnit, TemperatureUnit } from '../lib/units.ts'
 

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useServer } from '../context/ServerContext.tsx'
+import { useState, useEffect, useCallback } from 'react'
+import { useServer } from '../hooks/useServer.ts'
 import { useSkFetch } from '../hooks/useSkFetch.ts'
 import { CardShell } from '../components/CardShell.tsx'
 import { RawJson } from '../components/RawJson.tsx'
@@ -30,7 +30,7 @@ export function ResourcesCard() {
   const [error, setError] = useState<string | null>(null)
   const [rawData, setRawData] = useState<unknown>(null)
 
-  async function loadWaypoints() {
+  const loadWaypoints = useCallback(async () => {
     try {
       // GET /signalk/v2/api/resources/waypoints
       const res = await skFetch(`${v2Base}/resources/waypoints`)
@@ -42,9 +42,9 @@ export function ResourcesCard() {
     } catch {
       setError('Failed to load waypoints')
     }
-  }
+  }, [v2Base, skFetch])
 
-  async function loadRoutes() {
+  const loadRoutes = useCallback(async () => {
     try {
       // GET /signalk/v2/api/resources/routes
       const res = await skFetch(`${v2Base}/resources/routes`)
@@ -55,13 +55,13 @@ export function ResourcesCard() {
     } catch {
       setError('Failed to load routes')
     }
-  }
+  }, [v2Base, skFetch])
 
   useEffect(() => {
     if (!hasV2) return
-    loadWaypoints()
+    loadWaypoints() // eslint-disable-line react-hooks/set-state-in-effect -- data fetch on mount
     loadRoutes()
-  }, [hasV2])
+  }, [hasV2, loadWaypoints, loadRoutes])
 
   async function addWaypoint() {
     const lat = parseFloat(wpLat)

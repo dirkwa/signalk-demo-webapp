@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
-import { useServer } from '../context/ServerContext.tsx'
+import { useServer } from './useServer.ts'
 import { debug } from '../lib/debug.ts'
 
 export type StreamStatus = 'connecting' | 'open' | 'closed' | 'error'
@@ -12,7 +12,6 @@ export interface DeltaMessage {
     timestamp?: string
     values?: Array<{ path: string; value: unknown }>
   }>
-  // WS hello fields
   name?: string
   version?: string
   self?: string
@@ -27,9 +26,10 @@ interface SubscribeEntry {
 export function useSkStream() {
   const { wsBase, token } = useServer()
   const wsRef = useRef<WebSocket | null>(null)
-  const retryRef = useRef(0)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const subsRef = useRef<SubscribeEntry[]>([])
+  const connectRef = useRef<() => void>(() => {})
+  const retryCountRef = useRef(0)
   const [lastDelta, setLastDelta] = useState<DeltaMessage | null>(null)
   const [status, setStatus] = useState<StreamStatus>('closed')
   const [hello, setHello] = useState<DeltaMessage | null>(null)
@@ -47,7 +47,7 @@ export function useSkStream() {
     ws.onopen = () => {
       debug('ws open')
       setStatus('open')
-      retryRef.current = 0
+      retryCountRef.current = 0
       if (subsRef.current.length > 0) {
         const msg = JSON.stringify({
           context: 'vessels.self',
@@ -71,10 +71,10 @@ export function useSkStream() {
     ws.onclose = () => {
       debug('ws closed')
       setStatus('closed')
-      const delay = Math.min(1000 * Math.pow(2, retryRef.current), 30000)
-      retryRef.current++
+      const delay = Math.min(1000 * Math.pow(2, retryCountRef.current), 30000)
+      retryCountRef.current++
       debug('ws reconnect in', delay, 'ms')
-      retryTimerRef.current = setTimeout(connect, delay)
+      retryTimerRef.current = setTimeout(() => connectRef.current(), delay)
     }
 
     ws.onerror = () => {
@@ -83,9 +83,13 @@ export function useSkStream() {
     }
   }, [wsBase, token])
 
+  useEffect(() => {
+    connectRef.current = connect
+  }, [connect])
+
   const disconnect = useCallback(() => {
     clearTimeout(retryTimerRef.current)
-    retryRef.current = 0
+    retryCountRef.current = 0
     wsRef.current?.close()
     wsRef.current = null
     setStatus('closed')
@@ -134,6 +138,5 @@ export function useSkStream() {
     lastDelta,
     hello,
     status,
-    retryCount: retryRef.current,
   }
 }

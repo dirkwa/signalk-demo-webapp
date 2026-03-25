@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { useServer } from '../context/ServerContext.tsx'
+import { useServer } from './useServer.ts'
 import { debug } from '../lib/debug.ts'
 
 export function useSkFetch() {
